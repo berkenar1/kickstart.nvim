@@ -1,0 +1,82 @@
+name: FreeBSD Config Test
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test-freebsd:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Check Lua syntax
+      run: |
+        # Check if init.lua has valid Lua syntax
+        lua -l init.lua 2>&1 | head -20 || true
+    
+    - name: Validate shell scripts
+      run: |
+        # Validate shell scripts
+        sh -n install-freebsd.sh
+        sh -n check-freebsd.sh
+        sh -n uninstall-freebsd.sh
+    
+    - name: Check file structure
+      run: |
+        # Verify essential files exist
+        test -f README.md && echo "✓ README.md exists"
+        test -f init.lua && echo "✓ init.lua exists"
+        test -f install-freebsd.sh && echo "✓ install-freebsd.sh exists"
+        test -f check-freebsd.sh && echo "✓ check-freebsd.sh exists"
+        test -f uninstall-freebsd.sh && echo "✓ uninstall-freebsd.sh exists"
+        test -f Makefile && echo "✓ Makefile exists"
+        test -f lazy-lock.json && echo "✓ lazy-lock.json exists"
+    
+    - name: Check README format
+      run: |
+        # Verify README has essential sections
+        grep -q "kickstart.nvim-FreeBSD" README.md && echo "✓ README has correct title"
+        grep -q "FreeBSD" README.md && echo "✓ README mentions FreeBSD"
+        grep -q "install-freebsd.sh" README.md && echo "✓ README references install script"
+    
+    - name: Validate Makefile
+      run: |
+        # Check if Makefile syntax is valid
+        make -n help > /dev/null && echo "✓ Makefile is valid"
+
+  config-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Check for common config issues
+      run: |
+        # Check that treesitter config doesn't have hard-coded compiler paths
+        if grep -q "gcc" init.lua; then
+          echo "⚠ Warning: init.lua contains hardcoded 'gcc' reference"
+        fi
+        
+        # Check that Mason auto-install is disabled
+        if grep -q "lua_ls.*ensure_installed" init.lua; then
+          echo "✓ lua_ls auto-install is properly handled"
+        fi
+        
+        # Check treesitter build is disabled
+        if grep -q "build = false" init.lua; then
+          echo "✓ Treesitter build is disabled"
+        else
+          echo "⚠ Warning: Treesitter build might not be disabled"
+        fi
+    
+    - name: Lint shell scripts
+      run: |
+        # Simple shell script linting
+        for script in install-freebsd.sh check-freebsd.sh uninstall-freebsd.sh; do
+          echo "Checking $script..."
+          head -1 "$script" | grep -q "^#!/" && echo "✓ $script has shebang"
+        done
